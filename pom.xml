@@ -4,7 +4,7 @@
     <artifactId>org.ektorp.parent</artifactId>
     <packaging>pom</packaging>
     <name>Ektorp Parent</name>
-    <version>1.4.5-SNAPSHOT</version>
+    <version>1.5.1-SNAPSHOT</version>
     <description>a Java CouchDB persistence library</description>
     <scm>
         <connection>scm:git:git@github.com:helun/Ektorp.git</connection>
@@ -53,9 +53,10 @@
         <slf4j.version>1.6.4</slf4j.version>
         <log4j.version>1.2.13</log4j.version>
         <mockito.version>1.8.5</mockito.version>
+        <mockito.version>1.8.5</mockito.version>
         <junit.version>4.8.2</junit.version>
         <joda.time.version>2.3</joda.time.version>
-        <jackson.version>2.3.3</jackson.version>
+        <jackson.version>2.6.7</jackson.version>
         <spring.version>3.1.1.RELEASE</spring.version>
         <commons.io.version>2.0.1</commons.io.version>
         <httpclient.version>4.3</httpclient.version>
@@ -64,10 +65,6 @@
 
         <findbugs.skip>false</findbugs.skip>
         <findbugs.includeTests>true</findbugs.includeTests>
-
-        <skipITs>true</skipITs>
-        <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
-        <sonar.jacoco.itReportPath>${project.basedir}/../target/jacoco-it.exec</sonar.jacoco.itReportPath>
     </properties>
 
     <dependencyManagement>
@@ -164,25 +161,6 @@
                     <artifactId>findbugs-maven-plugin</artifactId>
                     <version>${findbugs.plugin.version}</version>
                 </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>2.16</version>
-                    <configuration>
-                        <argLine>${jacoco.agent.argLine}</argLine>
-                        <includes>
-                            <include>**/*IT.java</include>
-                        </includes>
-                    </configuration>
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>integration-test</goal>
-                                <goal>verify</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -241,7 +219,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>2.10.4</version>
                 <configuration>
-                    <additionalparam>-Xdoclint:none</additionalparam>
+                    <additionalparam>${javadoc.opts}</additionalparam>
                 </configuration>
                 <executions>
                     <execution>
@@ -269,23 +247,6 @@
                         <configuration>
                             <skip>false</skip>
                         </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <configuration>
-                    <skipITs>${skipITs}</skipITs>
-                    <!-- to fool Sonar to show test success for both unit and integration tests together -->
-                    <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
-                    <argLine>${jacoco.agent.argLine}</argLine>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
                     </execution>
                 </executions>
             </plugin>
@@ -399,60 +360,14 @@
                 <findbugs.plugin.version>3.0.0</findbugs.plugin.version>
             </properties>
         </profile>
-
-
         <profile>
-            <id>sonar</id>
-            <!-- Enable coverage computation via JaCoCo for Sonar's needs -->
-
+            <id>doclint-java8-disable</id>
+            <activation>
+                <jdk>[1.8,)</jdk>
+            </activation>
             <properties>
-                <skipITs>false</skipITs>
+                <javadoc.opts>-Xdoclint:none</javadoc.opts>
             </properties>
-
-            <build>
-                <plugins>
-                    <!--
-                    Compute integration test coverage for Sonar
-                    Note: REQUIRES MAVEN 3 - throws InstantiationException: java.util.List otherwise
-                    Beware: Sonar doesn't run the verify phase; you should always 'mvn clean install' before running sonar
-                    -->
-                    <plugin>
-                        <groupId>org.jacoco</groupId>
-                        <artifactId>jacoco-maven-plugin</artifactId>
-                        <configuration>
-                            <propertyName>jacoco.agent.argLine</propertyName>
-                            <!-- default: argLine -->
-                            <includes>
-                                <include>org/ektorp/**</include>
-                            </includes>
-                            <destFile>${project.build.directory}/jacoco-integration.exec</destFile>
-                            <!-- agent -->
-                            <dataFile>${project.build.directory}/jacoco-integration.exec</dataFile>
-                            <!-- report -->
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>agent</id>
-                                <goals>
-                                    <goal>prepare-agent</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <!--
-                                Generate coverage report html in target/site/jacoco/ from target/jacoco.exec
-                                Exec.: mvn verify site
-                                -->
-                                <id>report</id>
-                                <phase>site</phase>
-                                <goals>
-                                    <goal>report</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
         </profile>
-
     </profiles>
 </project>
