@@ -1,15 +1,11 @@
 package org.ektorp.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.http.HttpEntity;
 import org.ektorp.CouchDbInstance;
 import org.ektorp.DocumentOperationResult;
 import org.ektorp.PurgeResult;
-import org.ektorp.UpdateConflictException;
-import org.ektorp.http.HttpResponse;
-import org.ektorp.http.HttpStatus;
 import org.ektorp.http.JacksonableEntity;
-import org.ektorp.http.StdResponseHandler;
+import org.ektorp.http.ResponseCallback;
 import org.ektorp.util.Assert;
 import org.ektorp.util.Documents;
 
@@ -29,6 +25,7 @@ public class StreamedCouchDbConnector extends StdCouchDbConnector {
     {
         setCollectionBulkExecutor(new EntityCollectionBulkExecutor(dbURI, restTemplate, objectMapper));
         setInputStreamBulkExecutor(new InputStreamBulkEntityBulkExecutor(dbURI, restTemplate, objectMapper));
+        setCouchDbConnectorResponseHandlerFactory(new NonBlockingCouchDbConnectorResponseHandlerFactory(this));
     }
 
     protected HttpEntity createHttpEntity(Object o) {
@@ -67,13 +64,9 @@ public class StreamedCouchDbConnector extends StdCouchDbConnector {
     public PurgeResult purge(Map<String, List<String>> revisionsToPurge) {
         HttpEntity entity = createHttpEntity(revisionsToPurge);
 
-        return restTemplate.post(dbURI.append("_purge").toString(), entity,
-                new StdResponseHandler<PurgeResult>() {
-                    @Override
-                    public PurgeResult success(HttpResponse hr) throws Exception {
-                        return objectMapper.readValue(hr.getContent(), PurgeResult.class);
-                    }
-                });
+        ResponseCallback<PurgeResult> responseCallback = getCouchDbConnectorResponseHandlerFactory().getClassInstanceResponseHandler(PurgeResult.class);
+
+        return restTemplate.post(dbURI.append("_purge").toString(), entity, responseCallback);
     }
 
     @Override
@@ -84,26 +77,9 @@ public class StreamedCouchDbConnector extends StdCouchDbConnector {
 
         HttpEntity entity = createHttpEntity(o);
 
-        restTemplate.put(dbURI.append(id).toString(), entity,
-                new StdResponseHandler<Void>() {
-
-                    @Override
-                    public Void success(HttpResponse hr) throws Exception {
-                        JsonNode n = objectMapper.readValue(hr.getContent(),
-                                JsonNode.class);
-                        Documents.setRevision(o, n.get("rev").textValue());
-                        return null;
-                    }
-
-                    @Override
-                    public Void error(HttpResponse hr) {
-                        if (hr.getCode() == HttpStatus.CONFLICT) {
-                            throw new UpdateConflictException(id, Documents
-                                    .getRevision(o));
-                        }
-                        return super.error(hr);
-                    }
-                });
+        EntityUpdateResponseHandler responseHandler = getCouchDbConnectorResponseHandlerFactory().getEntityUpdateResponseHandler(o, id);
+        restTemplate.put(dbURI.append(id).toString(), entity, responseHandler);
     }
+
 }
 

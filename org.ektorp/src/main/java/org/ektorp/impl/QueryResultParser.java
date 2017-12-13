@@ -90,6 +90,13 @@ public class QueryResultParser<T> {
             JsonNode error = mapper.convertValue(errorFields, JsonNode.class);
             throw new DbAccessException(error.toString());
         }
+
+        // read the next token in order to make sure we read the entire stream content
+        JsonToken nextToken = jp.nextToken();
+        if (nextToken != null) {
+            throw new DbAccessException("content contains more than one JSON Object");
+        }
+
     }
 
     private void parseRows(JsonParser jp) throws IOException {
