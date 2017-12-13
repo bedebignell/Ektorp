@@ -1,5 +1,6 @@
 package org.ektorp.http;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -11,8 +12,6 @@ import javax.net.ssl.X509TrustManager;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpGet;
@@ -39,6 +38,9 @@ import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.params.HttpParams;
 import org.apache.http.params.HttpProtocolParams;
+import org.ektorp.http.clientconfig.CredentialsProviderConfigurer;
+import org.ektorp.http.clientconfig.HttpClientRequestExecutor;
+import org.ektorp.http.clientconfig.OldHttpClientRequestExecutor;
 import org.ektorp.util.Exceptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,26 +52,29 @@ import org.slf4j.LoggerFactory;
  */
 public class StdHttpClient implements HttpClient {
 
-	private final org.apache.http.client.HttpClient client;
-	private final org.apache.http.client.HttpClient backend;
 	private final static Logger LOG = LoggerFactory
 			.getLogger(StdHttpClient.class);
+
+	private final HttpClientRequestExecutor httpClientRequestExecutor;
 
 	public StdHttpClient(org.apache.http.client.HttpClient hc) {
 		this(hc, hc);
 	}
 	public StdHttpClient(org.apache.http.client.HttpClient hc, 
 			org.apache.http.client.HttpClient backend) {
-		this.client = hc;
-		this.backend = backend;
+		this(new OldHttpClientRequestExecutor(hc, backend));
+	}
+
+	public StdHttpClient(HttpClientRequestExecutor httpClientRequestExecutor) {
+		this.httpClientRequestExecutor = httpClientRequestExecutor;
 	}
 
 	public org.apache.http.client.HttpClient getClient() {
-		return client;
+		return httpClientRequestExecutor.locateHttpClient(false);
 	}
 
 	public org.apache.http.client.HttpClient getBackend() {
-		return backend;
+		return httpClientRequestExecutor.locateHttpClient(true);
 	}
 
 	@Override
@@ -170,15 +175,7 @@ public class StdHttpClient implements HttpClient {
 
 	protected HttpResponse executeRequest(HttpUriRequest request, boolean useBackend) {
 		try {
-			org.apache.http.HttpResponse rsp;
-			if (useBackend) {
-				rsp = backend.execute(request);
-			} else {
-				rsp = client.execute(getHttpHost(), request);
-			}
-			LOG.trace("{} {} {} {}", new Object[] { request.getMethod(), request.getURI(),
-					rsp.getStatusLine().getStatusCode(), rsp.getStatusLine().getReasonPhrase() });
-			return createHttpResponse(rsp, request);
+			return httpClientRequestExecutor.executeRequest(request, useBackend);
 		} catch (Exception e) {
 			throw Exceptions.propagate(e);
 		}		
@@ -198,11 +195,27 @@ public class StdHttpClient implements HttpClient {
 	}
 	
 	public void shutdown() {
-		client.getConnectionManager().shutdown();
+		httpClientRequestExecutor.shutdown();
 	}
 
+	/**
+	 * @deprecated this method is not used internally by Ektorp anymore. Ektorp users should not override this method. it may be removed in the future.
+	 * 
+	 * @see HttpClientRequestExecutor#getHttpHost(org.apache.http.client.HttpClient)
+	 */
+	@Deprecated
 	protected HttpHost getHttpHost() {
-		return (HttpHost)client.getParams().getParameter(ClientPNames.DEFAULT_HOST);
+		try {
+			org.apache.http.client.HttpClient client = null;
+			try {
+				client = httpClientRequestExecutor.locateHttpClient(false);
+				return httpClientRequestExecutor.getHttpHost(client);
+			} finally {
+				httpClientRequestExecutor.releaseHttpClient(client);
+			}
+		} catch (IOException e) {
+			throw Exceptions.propagate(e);
+		}
 	}
 
 	public static class Builder {
@@ -373,13 +386,12 @@ public class StdHttpClient implements HttpClient {
 			HttpParams params = configureHttpParams();
 			ClientConnectionManager connectionManager = configureConnectionManager(params);
 			DefaultHttpClient client = new DefaultHttpClient(connectionManager, params);
-			if (username != null && password != null) {
-				client.getCredentialsProvider().setCredentials(
-						new AuthScope(host, port, AuthScope.ANY_REALM),
-						new UsernamePasswordCredentials(username, password));
-				client.addRequestInterceptor(
-						new PreemptiveAuthRequestInterceptor(), 0);
-			}
+			CredentialsProviderConfigurer credentialsProviderConfigurer = new CredentialsProviderConfigurer();
+			credentialsProviderConfigurer.setUsername(username);
+			credentialsProviderConfigurer.setPassword(password);
+			credentialsProviderConfigurer.setHost(host);
+			credentialsProviderConfigurer.setPort(port);
+			credentialsProviderConfigurer.configure(client);
 			
 			if (compression) {
 				return new DecompressingHttpClient(client);

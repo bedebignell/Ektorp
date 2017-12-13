@@ -1,5 +1,6 @@
 package org.ektorp;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -13,8 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.ektorp.http.URI;
-import org.ektorp.impl.ObjectMapperFactory;
-import org.ektorp.impl.CachingObjectMapperFactory;
 import org.ektorp.impl.StdObjectMapperFactory;
 import org.ektorp.util.Assert;
 import org.ektorp.util.Exceptions;
@@ -66,13 +65,13 @@ public class ViewQuery {
 			}
 		}
 
-		public Object asDecoded() {
-			if (isRaw) {
-				return parseJson(rawKey);
-			} else {
-				return key;
-			}
-		}
+        public Object asDecoded() {
+            if (isRaw) {
+                return parseJson(rawKey);
+            } else {
+                return key;
+            }
+        }
 
 		public void copyTo(KeyOrRawKey other) {
 			if (isRaw) {
@@ -81,23 +80,17 @@ public class ViewQuery {
 				other.setKey(key);
 			}
 		}
-		
-	}
-	
 
-	private static ObjectMapperFactory DEFAULT_OBJECT_MAPPER_FACTORY = new CachingObjectMapperFactory(new StdObjectMapperFactory());
-	
-	public static void setDefaultObjectMapperFactory(ObjectMapperFactory objectMapperFactory) {
-		DEFAULT_OBJECT_MAPPER_FACTORY = objectMapperFactory;
 	}
-	
-	
+
+
+	private final static ObjectMapper DEFAULT_MAPPER = new StdObjectMapperFactory().createObjectMapper();
 	private final static String ALL_DOCS_VIEW_NAME = "_all_docs";
 	private final static int NOT_SET = -1;
 
 	private final Map<String, String> queryParams = new TreeMap<String, String>();
 
-	private final ObjectMapper mapper;
+	private ObjectMapper mapper;
 
 	private String dbPath;
 	private String designDocId;
@@ -126,7 +119,7 @@ public class ViewQuery {
 	private String listName;
 
 	public ViewQuery() {
-		this(DEFAULT_OBJECT_MAPPER_FACTORY.createObjectMapper());
+		mapper = DEFAULT_MAPPER;
 	}
 	/**
 	 * Bring your own ObjectMapper.
@@ -733,7 +726,8 @@ public class ViewQuery {
 
     @edu.umd.cs.findbugs.annotations.SuppressWarnings({"SA_FIELD_SELF_ASSIGNMENT", "CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"})
 	public ViewQuery clone() {
-		ViewQuery copy = new ViewQuery(mapper);
+		ViewQuery copy = new ViewQuery();
+		copy.mapper = mapper;
 		copy.cacheOk = cacheOk;
 		copy.dbPath = dbPath;
 		copy.descending = descending;
@@ -761,7 +755,7 @@ public class ViewQuery {
 		copy.viewName = viewName;
 		return copy;
 	}
-	
+
 	private void appendQueryParams(URI query) {
 		for (Map.Entry<String, String> param : queryParams.entrySet()) {
 			query.param(param.getKey(), param.getValue());
@@ -970,7 +964,7 @@ public class ViewQuery {
 		}
 
 		public String toJson() {
-			return toJson(DEFAULT_OBJECT_MAPPER_FACTORY.createObjectMapper());
+			return toJson(DEFAULT_MAPPER);
 		}
 
 		public String toJson(ObjectMapper mapper) {

@@ -1,7 +1,5 @@
 package org.ektorp.android.http;
 
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.client.methods.HttpUriRequest;
@@ -15,6 +13,9 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.HttpParams;
 import org.ektorp.http.*;
+import org.ektorp.http.HttpClient;
+import org.ektorp.http.clientconfig.CredentialsProviderConfigurer;
+import org.ektorp.http.clientconfig.HttpClientRequestExecutor;
 import org.ektorp.util.Exceptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,10 @@ public class AndroidHttpClient extends StdHttpClient {
 
     public AndroidHttpClient(org.apache.http.client.HttpClient hc, org.apache.http.client.HttpClient backend) {
         super(hc, backend);
+    }
+
+    public AndroidHttpClient(HttpClientRequestExecutor httpClientRequestExecutor) {
+        super(httpClientRequestExecutor);
     }
 
     @Override
@@ -108,13 +113,12 @@ public class AndroidHttpClient extends StdHttpClient {
             HttpParams params = configureHttpParams();
             ClientConnectionManager connectionManager = configureConnectionManager(params);
             DefaultHttpClient client = new DefaultHttpClient(connectionManager, params);
-            if (username != null && password != null) {
-                client.getCredentialsProvider().setCredentials(
-                        new AuthScope(host, port, AuthScope.ANY_REALM),
-                        new UsernamePasswordCredentials(username, password));
-                client.addRequestInterceptor(
-                        new PreemptiveAuthRequestInterceptor(), 0);
-            }
+            CredentialsProviderConfigurer credentialsProviderConfigurer = new CredentialsProviderConfigurer();
+            credentialsProviderConfigurer.setUsername(username);
+            credentialsProviderConfigurer.setPassword(password);
+            credentialsProviderConfigurer.setHost(host);
+            credentialsProviderConfigurer.setPort(port);
+            credentialsProviderConfigurer.configure(client);
 
 
             return client;

@@ -354,13 +354,18 @@ public class StdCouchDbConnectorTest {
                 .viewName("test_view")
                 .key("key_value");
 
-        doReturn(ResponseOnFileStub.newInstance(200, "view_result.json")).when(httpClient).getUncached(query.buildQuery());
+		ResponseOnFileStub httpResponse = ResponseOnFileStub.newInstance(200, "view_result.json");
+		doReturn(httpResponse).when(httpClient).getUncached(query.buildQuery());
 
         ViewResult result = dbCon.queryView(query);
 
         assertEquals(2, result.getSize());
         assertEquals("doc_id1", result.getRows().get(0).getId());
         assertEquals("doc_id2", result.getRows().get(1).getId());
+
+		assertTrue(((ResponseOnFileStub.CloseMonitoringInputStream)httpResponse.getContent()).isClosed());
+		assertTrue(((ResponseOnFileStub.CloseMonitoringInputStream)httpResponse.getContent()).isEOF());
+		assertTrue(httpResponse.isConnectionReleased());
     }
 
     @Test
@@ -456,9 +461,18 @@ public class StdCouchDbConnectorTest {
                 .viewName("test_view")
                 .keys(keys);
 
-        doReturn(ResponseOnFileStub.newInstance(200, "view_result.json")).when(httpClient).postUncached(anyString(), anyString());
-        dbCon.queryView(query);
+		ResponseOnFileStub httpResponse = ResponseOnFileStub.newInstance(200, "view_result.json");
+
+		doReturn(httpResponse).when(httpClient).postUncached(anyString(), anyString());
+
+		ViewResult viewResult = dbCon.queryView(query);
+
+		assertNotNull(viewResult);
+		assertEquals(2, viewResult.getSize());
         verify(httpClient).postUncached(query.buildQuery(), query.getKeysAsJson());
+		assertTrue(((ResponseOnFileStub.CloseMonitoringInputStream)httpResponse.getContent()).isClosed());
+		assertTrue(((ResponseOnFileStub.CloseMonitoringInputStream)httpResponse.getContent()).isEOF());
+		assertTrue(httpResponse.isConnectionReleased());
     }
 
     @Test

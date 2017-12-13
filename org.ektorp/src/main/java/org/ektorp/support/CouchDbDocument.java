@@ -117,6 +117,7 @@ public class CouchDbDocument implements Serializable {
 
 	protected void addInlineAttachment(Attachment a) {
 		Assert.notNull(a, "attachment may not be null");
+		Assert.hasText(a.getDataBase64(), "attachment must have data base64-encoded");
 		if (attachments == null) {
 			attachments = new HashMap<String, Attachment>();
 		}

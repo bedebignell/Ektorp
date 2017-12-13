@@ -1,6 +1,34 @@
 package org.ektorp.impl.jackson;
 
-import com.fasterxml.jackson.databind.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.ektorp.CouchDbConnector;
+import org.ektorp.docref.DocumentReferences;
+import org.ektorp.impl.docref.BackReferencedBeanDeserializer;
+import org.ektorp.impl.docref.ConstructibleAnnotatedCollection;
+import org.ektorp.util.Predicate;
+import org.ektorp.util.ReflectionUtils;
+
+import com.fasterxml.jackson.databind.AnnotationIntrospector;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.BeanDeserializer;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerBuilder;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
@@ -12,18 +40,6 @@ import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import com.fasterxml.jackson.databind.util.ClassUtil;
 import com.fasterxml.jackson.databind.util.SimpleBeanPropertyDefinition;
-import org.ektorp.CouchDbConnector;
-import org.ektorp.docref.DocumentReferences;
-import org.ektorp.impl.docref.BackReferencedBeanDeserializer;
-import org.ektorp.impl.docref.ConstructibleAnnotatedCollection;
-import org.ektorp.util.Predicate;
-import org.ektorp.util.ReflectionUtils;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.*;
 
 public class EktorpBeanDeserializerModifier extends BeanDeserializerModifier {
 
@@ -110,10 +126,7 @@ public class EktorpBeanDeserializerModifier extends BeanDeserializerModifier {
 		// need to ensure method is callable (for non-public)
 		if (config
 				.isEnabled(MapperFeature.CAN_OVERRIDE_ACCESS_MODIFIERS)) {
-			Method member = setter.getAnnotated();
-			if (!Modifier.isPublic(member.getModifiers()) || !Modifier.isPublic(member.getDeclaringClass().getModifiers())) {
-				member.setAccessible(true);
-			}
+			setter.fixAccess();
 		}
 
 		/*

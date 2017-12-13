@@ -115,7 +115,11 @@ public class RestTemplate {
 		try {
 			if (!hr.isSuccessful()) {
 				new StdResponseHandler<Void>().error(hr);
-			}
+			} else {
+				// in case CouchDB returns some content that is not used, but need to consume anyways
+				// for instance, fo a delete, CouchDB returns some content that it not used.
+				StdResponseHandler.consumeInputStreamQuietly(hr);
+            }
 		} finally {
 			hr.releaseConnection();
 		}
